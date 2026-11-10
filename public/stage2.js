@@ -13,6 +13,9 @@ const EVENT_LABELS = {
   kontrol_sorusu_dogru: 'Kontrol sorusu: doğru cevap',
   kontrol_sorusu_yanlis: 'Kontrol sorusu: yanlış cevap',
   konu_tamamlandi: 'Konuyu tamamladı',
+  sinav_basladi: 'Sınava başladı',
+  sinav_bitti: 'Sınavı bitirdi',
+  sinav_hakki_verildi: 'Yönetici yeni sınav hakkı tanıdı',
 };
 
 function fmtDur(sec) {
@@ -442,8 +445,12 @@ function topicStatus(t) {
 }
 
 async function learnerCourse(id) {
-  const { course, sections } = await api('GET', `/api/my/courses/${id}`);
+  const [{ course, sections }, { exams }] = await Promise.all([api('GET', `/api/my/courses/${id}`), api('GET', `/api/my/courses/${id}/exams`)]);
   const all = sections.flatMap((s) => s.topics);
+  const examRow = (e) => h('a', { class: 'learn-topic exam-row', href: examLink(id, e.id) }, h('span', { class: 'topic-no' }, '✎'), h('span', {}, e.title),
+    h('span', { class: 'muted small' }, `${e.question_count} soru`), examStateChip(e), h('span', { class: 'arrow' }, '→'));
+  const preTest = exams.find((e) => e.kind === 'on_test');
+  const finalExam = exams.find((e) => e.kind === 'final');
   const done = all.filter((t) => t.progress?.completed).length;
   const percent = all.length ? Math.round((done * 100) / all.length) : 0;
   learnerPage(h('div', {},
@@ -452,6 +459,7 @@ async function learnerCourse(id) {
     all.length ? h('div', { class: 'card card-pad course-progress' },
       h('div', { class: 'prog' }, h('progress', { max: 100, value: percent }), h('b', {}, `%${percent}`)),
       h('span', { class: 'muted small' }, `${done} / ${all.length} konu tamamlandı`)) : null,
+    preTest ? h('section', { class: 'card learn-section' }, h('div', { class: 'section-head' }, h('h3', {}, 'Başlamadan önce')), examRow(preTest)) : null,
     sections.length === 0 ? h('div', { class: 'card empty' }, 'Bu eğitimin içeriği henüz hazırlanıyor.')
       : sections.map((s, si) => h('section', { class: 'card learn-section' },
         h('div', { class: 'section-head' }, h('span', { class: 'section-no' }, si + 1), h('h3', {}, s.title)),
@@ -459,11 +467,14 @@ async function learnerCourse(id) {
         s.topics.map((t, ti) => h('a', { class: 'learn-topic', href: `#/learner/course/${id}/topic/${t.id}` },
           h('span', { class: 'topic-no' }, `${si + 1}.${ti + 1}`), h('span', {}, t.title),
           t.has_video ? h('span', { class: 'muted small' }, 'Video · ' + fmtDur(t.video_duration)) : null,
-          topicStatus(t), h('span', { class: 'arrow' }, '→')))))), true);
+          topicStatus(t), h('span', { class: 'arrow' }, '→'))),
+        exams.filter((e) => e.kind === 'konu' && s.topics.some((t) => t.id === e.topic_id)).map(examRow))),
+    finalExam ? h('section', { class: 'card learn-section' }, h('div', { class: 'section-head' }, h('h3', {}, 'Eğitim sonu')), examRow(finalExam)) : null), true);
 }
 
 async function learnerTopic(courseId, topicId) {
-  const [{ topic }, { course, sections }] = await Promise.all([api('GET', `/api/my/topics/${topicId}`), api('GET', `/api/my/courses/${courseId}`)]);
+  const [{ topic }, { course, sections }, { exams }] = await Promise.all([api('GET', `/api/my/topics/${topicId}`), api('GET', `/api/my/courses/${courseId}`), api('GET', `/api/my/courses/${courseId}/exams`)]);
+  const topicExam = exams.find((e) => e.kind === 'konu' && e.topic_id === topic.id);
   if (topic.course_id !== Number(courseId)) throw new Error('Konu bulunamadı.');
   const flat = sections.flatMap((s) => s.topics.map((t) => ({ ...t, section: s.title })));
   const i = flat.findIndex((t) => t.id === topic.id);
@@ -497,5 +508,6 @@ async function learnerTopic(courseId, topicId) {
     h('div', { class: 'crumbs' }, h('a', { href: '#/learner' }, 'Eğitimlerim'), h('span', {}, '/'),
       h('a', { href: '#/learner/course/' + courseId }, course.title), h('span', {}, '/'), flat[i]?.section || ''),
     h('article', { class: 'card card-pad stack' }, h('h1', {}, topic.title), parts),
+    topicExam ? h('a', { class: 'card card-pad exam-card', href: examLink(courseId, topicExam.id) }, h('div', {}, h('b', {}, 'Bu konunun sınavı'), h('span', { class: 'sub' }, topicExam.state === 'kilitli' ? 'Konuyu tamamladıktan sonra açılır.' : `${topicExam.question_count} soru · geçme notu ${topicExam.pass_score}`)), examStateChip(topicExam), h('span', { class: 'arrow' }, '→')) : null,
     h('div', { class: 'pager' }, nav(flat[i - 1], '← ' + (flat[i - 1]?.title || ''), ''), nav(flat[i + 1], (flat[i + 1]?.title || '') + ' →', 'btn-primary'))), true);
 }

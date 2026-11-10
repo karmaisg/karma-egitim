@@ -251,3 +251,31 @@ progress::-moz-progress-bar { background: var(--red); border-radius: 99px; }
 .pq-feedback { margin: 0; color: var(--red-dark); font-weight: 600; min-height: 1.2em; }
 .player-wrap .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 640px) { .player-question { padding: 12px; } .player-question h3 { font-size: 16px; } }
+
+/* ---------- Aşama 3: sınavlar ---------- */
+.topic-row.inactive { opacity: .55; }
+.exam-row .topic-no { color: var(--red); font-weight: 700; }
+.exam-card { display: flex; align-items: center; gap: 12px; margin-top: 16px; text-decoration: none; color: inherit; }
+.exam-card > div { flex: 1; }
+.exam-card .sub { display: block; color: var(--muted); font-size: 13px; }
+.exam-card:hover { border-color: var(--red); }
+.exam-rules { margin: 0; padding-left: 20px; color: var(--ink-2); display: grid; gap: 4px; }
+.exam-q { border: 1px solid var(--line); margin: 0; min-width: 0; }
+.exam-q legend { font-weight: 600; padding: 0 6px; margin-left: -6px; float: left; width: 100%; margin-bottom: 10px; }
+.exam-q legend + * { clear: both; }
+.exam-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.exam-opt:hover { border-color: var(--line-strong); background: #faf9f6; }
+.exam-opt:has(input:checked) { border-color: var(--red); background: var(--red-tint); }
+.exam-opt input { margin-top: 3px; accent-color: var(--red); }
+.result { text-align: center; align-items: center; }
+.result .row { justify-content: center; }
+.score { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.score b { font-size: 64px; line-height: 1; }
+.score span { color: var(--muted); font-size: 20px; }
+.result-pass .score b, .result-pass h2 { color: var(--ok); }
+.result-fail .score b { color: var(--red); }
+.callout.ok { background: var(--ok-tint); border-color: #b9dcc8; color: var(--ok); }
+.review { margin-top: 10px; }
+.review-opts { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); }
+.review-opts li.right { color: var(--ok); font-weight: 600; }
+.review-opts li.picked:not(.right) { color: var(--red); font-weight: 600; }

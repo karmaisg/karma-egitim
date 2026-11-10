@@ -101,6 +101,66 @@ export const SCHEMA_STATEMENTS = [
     detail TEXT,
     created_at INTEGER NOT NULL
   )`,
+  // Aşama 3: sınavlar (md. 16). kind: 'on_test' (md. 16/1 ön seviye tespiti), 'konu' (konu sonu), 'final' (eğitim sonu, md. 16/2)
+  `CREATE TABLE IF NOT EXISTS exams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    topic_id INTEGER REFERENCES topics(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('on_test','konu','final')),
+    title TEXT NOT NULL,
+    pass_score INTEGER NOT NULL DEFAULT 60,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_topic ON exams(topic_id) WHERE topic_id IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_course_kind ON exams(course_id, kind) WHERE topic_id IS NULL`,
+  `CREATE TABLE IF NOT EXISTS exam_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    options TEXT NOT NULL,
+    correct INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS exam_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    total INTEGER NOT NULL,
+    correct_count INTEGER,
+    score INTEGER,
+    passed INTEGER,
+    plan TEXT NOT NULL
+  )`,
+  // Her cevap, sorunun o andaki metniyle birlikte saklanır (sonradan soru değişse bile sınav kaydı bozulmaz).
+  `CREATE TABLE IF NOT EXISTS exam_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    question_id INTEGER,
+    question_text TEXT NOT NULL,
+    options TEXT NOT NULL,
+    correct_index INTEGER NOT NULL,
+    selected INTEGER,
+    is_correct INTEGER NOT NULL
+  )`,
+  // Deneme hakkı tükenen katılımcıya yönetici yeni hak tanıyabilir; eski denemeler silinmez.
+  `CREATE TABLE IF NOT EXISTS exam_grants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    attempts_at_grant INTEGER NOT NULL DEFAULT 0,
+    note TEXT,
+    granted_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_attempts_user_exam ON exam_attempts(user_id, exam_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_exam_questions ON exam_questions(exam_id, position)`,
+  `CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_exam_grants ON exam_grants(user_id, exam_id)`,
   `CREATE INDEX IF NOT EXISTS idx_checkpoints_topic ON checkpoints(topic_id, at_second)`,
   `CREATE INDEX IF NOT EXISTS idx_progress_topic ON topic_progress(topic_id)`,
   `CREATE INDEX IF NOT EXISTS idx_answers_user ON checkpoint_answers(user_id, checkpoint_id)`,

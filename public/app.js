@@ -183,6 +183,7 @@ const ADMIN_NAV = [
   { key: 'companies', href: '#/admin/companies', label: 'Firmalar' },
   { key: 'assignments', href: '#/admin/assignments', label: 'Atamalar' },
   { key: 'reports', href: '#/admin/reports', label: 'Raporlar' },
+  { key: 'exams', href: '#/admin/exams', label: 'Sınavlar' },
 ];
 const LEARNER_NAV = [{ key: 'home', href: '#/learner', label: 'Eğitimlerim' }];
 
@@ -429,7 +430,7 @@ async function adminCourses() {
 }
 
 async function adminCourse(id) {
-  const { course, sections } = await api('GET', `/api/admin/courses/${id}`);
+  const [{ course, sections }, { exams }] = await Promise.all([api('GET', `/api/admin/courses/${id}`), api('GET', `/api/admin/courses/${id}/exams`)]);
   const reload = () => render();
 
   const editCourse = () => formModal({
@@ -497,6 +498,7 @@ async function adminCourse(id) {
       arrows('topics', t, ti, s.topics.length),
       h('button', { class: 'btn btn-sm', onclick: () => videoModal(t, reload) }, 'Video'),
       t.has_video ? h('button', { class: 'btn btn-sm', onclick: () => checkpointsModal(t, reload).catch((e) => toast(e.message, true)) }, 'Sorular') : null,
+      topicExamButton(id, t, exams, reload),
       h('button', { class: 'btn btn-sm', onclick: () => topicForm(s, t) }, 'Düzenle'),
       h('button', { class: 'btn btn-sm btn-danger', onclick: () => deleteTopic(t) }, 'Sil'))),
     h('div', { class: 'add-row' }, h('button', { class: 'btn btn-sm', onclick: () => topicForm(s, null) }, '+ Konu ekle'))));
@@ -508,6 +510,7 @@ async function adminCourse(id) {
       h('button', { class: 'btn btn-danger', onclick: deleteCourse }, 'Eğitimi sil')]),
     h('div', { class: 'stack' },
       sectionEls.length ? sectionEls : h('div', { class: 'card empty' }, 'Bu eğitimde henüz bölüm yok. İlk bölümü ekleyerek başlayın.'),
+      courseExamsCard(id, exams, reload),
       h('div', {}, h('button', { class: 'btn btn-primary', onclick: addSection }, '+ Bölüm ekle')))));
 }
 
@@ -637,9 +640,11 @@ async function render() {
       if (sub === 'companies') return await adminCompanies();
       if (sub === 'assignments') return await adminAssignments();
       if (sub === 'reports') return await adminReports();
+      if (sub === 'exams') return await adminExamResults();
     }
     if (area === 'learner') {
       if (!sub) return await learnerHome();
+      if (sub === 'course' && a && b === 'exam' && c) return await learnerExam(a, c);
       if (sub === 'course' && a && b === 'topic' && c) return await learnerTopic(a, c);
       if (sub === 'course' && a) return await learnerCourse(a);
     }

@@ -23,6 +23,15 @@ Sonraki aşamalar: video oynatıcı ve katılım kayıtları (Yön. md. 12/4, 12
 
 Cloudflare tarafında R2 kovasının (`karma-egitim-videolari`) var olması gerekir; yoksa video bölümü "503" verir.
 
+## Aşama 3 — sınavlar (Yönetmelik md. 16)
+
+- **Üç tür sınav:** *Ön test* (md. 16/1, seviye tespiti, tek deneme, başarı şartı yok), *konu sınavı* (her konunun sonunda, isteğe bağlı) ve *eğitim sonu sınavı* (md. 16/2).
+- **Geçme notu 100 üzerinden 60;** ilk sınavdan sonra en fazla 2 hak daha (toplam 3 deneme, md. 16/3). Hakkı dolan katılımcının temel eğitime yeniden katılması gerekir; yönetici "Sınavlar" sayfasından **Hak tanı** ile yeni hak verir (eski denemeler silinmez).
+- **Açılma sırası:** Konu sınavı, konu tamamlanınca açılır. Eğitim sonu sınavı, tüm konular ve konu sınavları geçilince açılır.
+- **Sorular:** Eğitim sayfasında konu satırındaki "Sınav" düğmesi ve "Eğitim sınavları" kartı. 2-5 seçenekli, tek doğru cevaplı. Her denemede soru ve seçenek sırası karışır; doğru cevap tarayıcıya gönderilmez.
+- **Kayıt:** Her denemenin soruları, seçenekleri, verilen cevaplar, puan ve zamanları saklanır. Sınava giren katılımcı olan sınavın soruları değiştirilemez/silinemez (pasife alınabilir); sınav, konu ve eğitim silinemez.
+- **Sınavlar** menüsü: tüm denemeler, cevap ayrıntısı, CSV indirme.
+
 ## Cloudflare'e yükleme (Workers Builds ile GitHub'dan)
 
 1. Bu klasörü bir GitHub deposuna yükleyin.
@@ -48,6 +57,7 @@ npm test                             # API testleri (Aşama 1 + 2)
 node test/devserver.mjs              # yerel deneme sunucusu (http://localhost:8787, bellek içi D1 + R2)
 node test/e2e.mjs                    # Aşama 1 tarayıcı testi (Playwright gerekir)
 PORT=8788 node test/devserver.mjs & VIDEO=/yol/test.webm node test/e2e-stage2.mjs   # Aşama 2 tarayıcı testi
+node test/e2e-stage3.mjs             # Aşama 3 tarayıcı testi (aynı sunucu, boş veritabanıyla)
 ```
 
 Node 22+ gerekir. Test sunucusunun kurulum kodu: `deneme-kodu-123` (yalnızca yerelde geçerlidir).

@@ -5,6 +5,7 @@ import { ensureSchema } from './schema.js';
 import { COOKIE, one, all, run, currentUser, requireUser, requireAdmin, logEvent } from './core.js';
 import { videoRoutes, deleteVideoObjects } from './video.js';
 import { progressRoutes } from './progress.js';
+import { examRoutes } from './exams.js';
 import {
   HttpError, json, reqStr, optStr, textBlock, parseId, username as vUsername, tcNo,
   checkPasswordStrength, hashPassword, verifyPassword, getDummyHash, timingSafeEqual,
@@ -310,6 +311,8 @@ async function deleteCourse(ctx) {
   const used = await one(ctx.env,
     `SELECT COUNT(*) AS n FROM topic_progress p JOIN topics t ON t.id = p.topic_id JOIN sections s ON s.id = t.section_id WHERE s.course_id = ?`, id);
   if (used.n > 0) throw new HttpError(409, 'Bu eğitimde katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const exams = await one(ctx.env, 'SELECT COUNT(*) AS n FROM exam_attempts a JOIN exams e ON e.id = a.exam_id WHERE e.course_id = ?', id);
+  if (exams.n > 0) throw new HttpError(409, 'Bu eğitimde sınav kayıtları var. Kayıtların korunması için silinemez.');
   const videos = await all(ctx.env,
     `SELECT t.video_key FROM topics t JOIN sections s ON s.id = t.section_id WHERE s.course_id = ? AND t.video_key IS NOT NULL`, id);
   await run(ctx.env, 'DELETE FROM courses WHERE id = ?', id);
@@ -343,6 +346,8 @@ async function deleteSection(ctx) {
   const used = await one(ctx.env,
     'SELECT COUNT(*) AS n FROM topic_progress p JOIN topics t ON t.id = p.topic_id WHERE t.section_id = ?', id);
   if (used.n > 0) throw new HttpError(409, 'Bu bölümdeki konularda katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const exams = await one(ctx.env, 'SELECT COUNT(*) AS n FROM exam_attempts a JOIN exams e ON e.id = a.exam_id JOIN topics t ON t.id = e.topic_id WHERE t.section_id = ?', id);
+  if (exams.n > 0) throw new HttpError(409, 'Bu bölümdeki konu sınavlarında kayıtlar var. Kayıtların korunması için silinemez.');
   const videos = await all(ctx.env, 'SELECT video_key FROM topics WHERE section_id = ? AND video_key IS NOT NULL', id);
   await run(ctx.env, 'DELETE FROM sections WHERE id = ?', id);
   await deleteVideoObjects(ctx.env, videos.map((v) => v.video_key));
@@ -375,6 +380,8 @@ async function deleteTopic(ctx) {
   const id = parseId(ctx.params.id, 'Konu');
   const used = await one(ctx.env, 'SELECT COUNT(*) AS n FROM topic_progress WHERE topic_id = ?', id);
   if (used.n > 0) throw new HttpError(409, 'Bu konuda katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const exams = await one(ctx.env, 'SELECT COUNT(*) AS n FROM exam_attempts a JOIN exams e ON e.id = a.exam_id WHERE e.topic_id = ?', id);
+  if (exams.n > 0) throw new HttpError(409, 'Bu konunun sınavında katılımcı kayıtları var. Kayıtların korunması için silinemez.');
   const t = await one(ctx.env, 'SELECT video_key FROM topics WHERE id = ?', id);
   await run(ctx.env, 'DELETE FROM topics WHERE id = ?', id);
   if (t?.video_key) await deleteVideoObjects(ctx.env, [t.video_key]);
@@ -522,6 +529,7 @@ add('GET', '/api/my/courses/:id', myCourse);
 
 videoRoutes(add);
 progressRoutes(add);
+examRoutes(add);
 
 export async function handleApi(request, env) {
   const url = new URL(request.url);
