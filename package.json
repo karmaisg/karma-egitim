@@ -1,0 +1,10 @@
+{
+  "name": "karma-egitim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KARMA OSGB Eğitim Platformu",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
