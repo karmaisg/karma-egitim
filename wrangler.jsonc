@@ -16,5 +16,12 @@
       "database_name": "karma-egitim-db"
     }
   ],
+  "r2_buckets": [
+    {
+      // Eğitim videoları. Kovanın herkese açık erişimi KAPALI olmalı; videolar yalnızca bu uygulama üzerinden akar.
+      "binding": "VIDEOS",
+      "bucket_name": "karma-egitim-videolari"
+    }
+  ],
   "observability": { "enabled": true }
 }

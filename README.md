@@ -12,6 +12,17 @@ Cloudflare üzerinde çalışır (Workers + D1 veritabanı). Şifreler asla düz
 
 Sonraki aşamalar: video oynatıcı ve katılım kayıtları (Yön. md. 12/4, 12/5), sınavlar (md. 16/2), PDF katılım belgesi (md. 17).
 
+## Aşama 2 — video ve katılım kayıtları (Yönetmelik md. 12/4, 12/5)
+
+- **Video yükleme:** Eğitim sayfasında her konunun yanındaki "Video" düğmesi. MP4/WebM, parçalar halinde Cloudflare R2'ye (`karma-egitim-videolari`, herkese kapalı) yüklenir. Videolar yalnızca giriş yapmış ve o eğitime atanmış katılımcıya, Worker üzerinden akıtılır; indirme bağlantısı yoktur.
+- **Kontrol soruları:** "Sorular" düğmesiyle videonun belirli saniyelerine soru eklenir; doğru cevaplanmadan video devam etmez.
+- **İleri sarma engeli:** İlerleme çubuğu tıklanamaz, hız değiştirilemez; sunucu da konumu doğrular. Sekme değişince video duraklar ve kayda geçer.
+- **Raporlar:** Yönetici menüsünde "Raporlar": katılımcı bazında ilerleme, izleme süresi, son giriş, ayrıntılı etkinlik günlüğü ve CSV indirme.
+- **Kayıt koruma:** İlerleme kaydı olan eğitim/bölüm/konu/video/soru silinemez ve değiştirilemez.
+- **Yazılı konular:** En az 5 saniye okuduktan sonra "Konuyu tamamladım" ile tamamlanır.
+
+Cloudflare tarafında R2 kovasının (`karma-egitim-videolari`) var olması gerekir; yoksa video bölümü "503" verir.
+
 ## Cloudflare'e yükleme (Workers Builds ile GitHub'dan)
 
 1. Bu klasörü bir GitHub deposuna yükleyin.
@@ -33,9 +44,10 @@ Sonraki aşamalar: video oynatıcı ve katılım kayıtları (Yön. md. 12/4, 12
 ## Yerel test (geliştiriciler için)
 
 ```
-node --test test/api.test.mjs        # API testleri
-node test/devserver.mjs              # yerel deneme sunucusu (http://localhost:8787)
-node test/e2e.mjs                    # tarayıcı testi (Playwright gerekir)
+npm test                             # API testleri (Aşama 1 + 2)
+node test/devserver.mjs              # yerel deneme sunucusu (http://localhost:8787, bellek içi D1 + R2)
+node test/e2e.mjs                    # Aşama 1 tarayıcı testi (Playwright gerekir)
+PORT=8788 node test/devserver.mjs & VIDEO=/yol/test.webm node test/e2e-stage2.mjs   # Aşama 2 tarayıcı testi
 ```
 
 Node 22+ gerekir. Test sunucusunun kurulum kodu: `deneme-kodu-123` (yalnızca yerelde geçerlidir).

@@ -60,6 +60,51 @@ export const SCHEMA_STATEMENTS = [
     assigned_at INTEGER NOT NULL,
     UNIQUE (user_id, course_id)
   )`,
+  // ---- Aşama 2: katılım takibi ----
+  // Video içinde belirli saniyede çıkan kısa kontrol soruları (md. 12/5: katılımı destekleme)
+  `CREATE TABLE IF NOT EXISTS checkpoints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    at_second INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    options TEXT NOT NULL,
+    correct INTEGER NOT NULL
+  )`,
+  // Katılımcının konu bazlı ilerlemesi (md. 12/4: tamamlama oranı)
+  `CREATE TABLE IF NOT EXISTS topic_progress (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    max_position REAL NOT NULL DEFAULT 0,
+    last_position REAL NOT NULL DEFAULT 0,
+    watched_seconds INTEGER NOT NULL DEFAULT 0,
+    completed INTEGER NOT NULL DEFAULT 0,
+    started_at INTEGER NOT NULL,
+    last_heartbeat_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    PRIMARY KEY (user_id, topic_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS checkpoint_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    checkpoint_id INTEGER NOT NULL REFERENCES checkpoints(id) ON DELETE CASCADE,
+    selected INTEGER NOT NULL,
+    is_correct INTEGER NOT NULL,
+    answered_at INTEGER NOT NULL
+  )`,
+  // Giriş-çıkış ve katılım olayları (md. 12/4: kayıt altına alma, izleme, raporlama)
+  `CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic_id INTEGER REFERENCES topics(id) ON DELETE SET NULL,
+    course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+    event TEXT NOT NULL,
+    detail TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_checkpoints_topic ON checkpoints(topic_id, at_second)`,
+  `CREATE INDEX IF NOT EXISTS idx_progress_topic ON topic_progress(topic_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_answers_user ON checkpoint_answers(user_id, checkpoint_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_sections_course ON sections(course_id, position)`,
   `CREATE INDEX IF NOT EXISTS idx_topics_section ON topics(section_id, position)`,
   `CREATE INDEX IF NOT EXISTS idx_assign_user ON assignments(user_id)`,
@@ -67,12 +112,31 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`,
 ];
 
+// Mevcut (Aşama 1'den kalma) veritabanlarına sonradan eklenen sütunlar.
+// SQLite'ta "ADD COLUMN IF NOT EXISTS" olmadığından önce sütunun varlığı kontrol edilir.
+const TOPIC_COLUMNS = [
+  ['video_key', 'TEXT'],
+  ['video_name', 'TEXT'],
+  ['video_type', 'TEXT'],
+  ['video_size', 'INTEGER'],
+  ['video_duration', 'INTEGER'], // saniye
+];
+
+async function migrate(db) {
+  const have = (await db.prepare("SELECT name FROM pragma_table_info('topics')").all()).results.map((r) => r.name);
+  const missing = TOPIC_COLUMNS.filter(([name]) => !have.includes(name));
+  if (missing.length) {
+    await db.batch(missing.map(([name, type]) => db.prepare(`ALTER TABLE topics ADD COLUMN ${name} ${type}`)));
+  }
+}
+
 let ready = null;
 
 export function ensureSchema(db) {
   if (!ready) {
     ready = db
       .batch(SCHEMA_STATEMENTS.map((s) => db.prepare(s)))
+      .then(() => migrate(db))
       .catch((e) => {
         ready = null; // bir sonraki istekte tekrar dene
         throw e;

@@ -2,57 +2,24 @@
 // Aşama 1: giriş, yönetici paneli, eğitim/bölüm/konu yapısı, firma, katılımcı, atama.
 
 import { ensureSchema } from './schema.js';
+import { COOKIE, one, all, run, currentUser, requireUser, requireAdmin, logEvent } from './core.js';
+import { videoRoutes, deleteVideoObjects } from './video.js';
+import { progressRoutes } from './progress.js';
 import {
   HttpError, json, reqStr, optStr, textBlock, parseId, username as vUsername, tcNo,
   checkPasswordStrength, hashPassword, verifyPassword, getDummyHash, timingSafeEqual,
   randomToken, sha256Hex, generatePassword, parseCookies,
 } from './util.js';
 
-const COOKIE = 'karma_session';
 const SESSION_MS = 12 * 60 * 60 * 1000; // 12 saat
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 const HAZARDS = ['az_tehlikeli', 'tehlikeli', 'cok_tehlikeli'];
 
-// ---------- Veritabanı kısayolları ----------
-const one = (env, sql, ...p) => env.DB.prepare(sql).bind(...p).first();
-const all = async (env, sql, ...p) => (await env.DB.prepare(sql).bind(...p).all()).results;
-const run = (env, sql, ...p) => env.DB.prepare(sql).bind(...p).run();
-
 // ---------- Oturum ----------
 function cookieHeader(url, value, maxAge) {
   const secure = url.protocol === 'https:' ? '; Secure' : '';
   return `${COOKIE}=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`;
-}
-
-async function currentUser(ctx) {
-  if (ctx._user !== undefined) return ctx._user;
-  const token = parseCookies(ctx.request.headers.get('cookie'))[COOKIE];
-  let user = null;
-  if (token) {
-    const id = await sha256Hex(token);
-    user = await one(
-      ctx.env,
-      `SELECT u.id, u.username, u.full_name, u.role, u.company_id
-         FROM sessions s JOIN users u ON u.id = s.user_id
-        WHERE s.id = ? AND s.expires_at > ? AND u.active = 1`,
-      id, Date.now(),
-    );
-  }
-  ctx._user = user || null;
-  return ctx._user;
-}
-
-async function requireUser(ctx) {
-  const u = await currentUser(ctx);
-  if (!u) throw new HttpError(401, 'Oturum açmanız gerekiyor.');
-  return u;
-}
-
-async function requireAdmin(ctx) {
-  const u = await requireUser(ctx);
-  if (u.role !== 'admin') throw new HttpError(403, 'Bu işlem için yönetici yetkisi gerekiyor.');
-  return u;
 }
 
 async function startSession(ctx, userId) {
@@ -117,11 +84,14 @@ async function login(ctx) {
     throw new HttpError(401, 'Kullanıcı adı veya şifre hatalı.');
   }
   await run(ctx.env, 'DELETE FROM login_attempts WHERE key = ?', key);
+  await logEvent(ctx.env, user.id, 'giris');
   const cookie = await startSession(ctx, user.id);
   return json({ ok: true, role: user.role }, 200, { 'set-cookie': cookie });
 }
 
 async function logout(ctx) {
+  const u = await currentUser(ctx);
+  if (u) await logEvent(ctx.env, u.id, 'cikis');
   const token = parseCookies(ctx.request.headers.get('cookie'))[COOKIE];
   if (token) await run(ctx.env, 'DELETE FROM sessions WHERE id = ?', await sha256Hex(token));
   return json({ ok: true }, 200, { 'set-cookie': cookieHeader(ctx.url, '', 0) });
@@ -296,7 +266,9 @@ async function courseTree(env, courseId) {
   if (!course) return null;
   const sections = await all(env, 'SELECT id, title, position FROM sections WHERE course_id = ? ORDER BY position, id', courseId);
   const topics = await all(env,
-    `SELECT t.id, t.section_id, t.title, t.content, t.position
+    `SELECT t.id, t.section_id, t.title, t.content, t.position,
+            t.video_name, t.video_size, t.video_duration, (t.video_key IS NOT NULL) AS has_video,
+            (SELECT COUNT(*) FROM checkpoints c WHERE c.topic_id = t.id) AS checkpoint_count
        FROM topics t JOIN sections s ON s.id = t.section_id
       WHERE s.course_id = ? ORDER BY t.position, t.id`, courseId);
   for (const s of sections) s.topics = topics.filter((t) => t.section_id === s.id);
@@ -335,7 +307,13 @@ async function deleteCourse(ctx) {
   if (n.n > 0) {
     throw new HttpError(409, 'Bu eğitim katılımcılara atanmış. Eğitim kayıtlarının korunması için önce atamaları kaldırmanız gerekir.');
   }
+  const used = await one(ctx.env,
+    `SELECT COUNT(*) AS n FROM topic_progress p JOIN topics t ON t.id = p.topic_id JOIN sections s ON s.id = t.section_id WHERE s.course_id = ?`, id);
+  if (used.n > 0) throw new HttpError(409, 'Bu eğitimde katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const videos = await all(ctx.env,
+    `SELECT t.video_key FROM topics t JOIN sections s ON s.id = t.section_id WHERE s.course_id = ? AND t.video_key IS NOT NULL`, id);
   await run(ctx.env, 'DELETE FROM courses WHERE id = ?', id);
+  await deleteVideoObjects(ctx.env, videos.map((v) => v.video_key));
   return json({ ok: true });
 }
 
@@ -361,7 +339,13 @@ async function updateSection(ctx) {
 
 async function deleteSection(ctx) {
   await requireAdmin(ctx);
-  await run(ctx.env, 'DELETE FROM sections WHERE id = ?', parseId(ctx.params.id, 'Bölüm'));
+  const id = parseId(ctx.params.id, 'Bölüm');
+  const used = await one(ctx.env,
+    'SELECT COUNT(*) AS n FROM topic_progress p JOIN topics t ON t.id = p.topic_id WHERE t.section_id = ?', id);
+  if (used.n > 0) throw new HttpError(409, 'Bu bölümdeki konularda katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const videos = await all(ctx.env, 'SELECT video_key FROM topics WHERE section_id = ? AND video_key IS NOT NULL', id);
+  await run(ctx.env, 'DELETE FROM sections WHERE id = ?', id);
+  await deleteVideoObjects(ctx.env, videos.map((v) => v.video_key));
   return json({ ok: true });
 }
 
@@ -388,7 +372,12 @@ async function updateTopic(ctx) {
 
 async function deleteTopic(ctx) {
   await requireAdmin(ctx);
-  await run(ctx.env, 'DELETE FROM topics WHERE id = ?', parseId(ctx.params.id, 'Konu'));
+  const id = parseId(ctx.params.id, 'Konu');
+  const used = await one(ctx.env, 'SELECT COUNT(*) AS n FROM topic_progress WHERE topic_id = ?', id);
+  if (used.n > 0) throw new HttpError(409, 'Bu konuda katılımcı ilerleme kayıtları var. Kayıtların korunması için silinemez.');
+  const t = await one(ctx.env, 'SELECT video_key FROM topics WHERE id = ?', id);
+  await run(ctx.env, 'DELETE FROM topics WHERE id = ?', id);
+  if (t?.video_key) await deleteVideoObjects(ctx.env, [t.video_key]);
   return json({ ok: true });
 }
 
@@ -471,13 +460,26 @@ async function myCourse(ctx) {
   const courseId = parseId(ctx.params.id, 'Eğitim');
   const assigned = await one(ctx.env, 'SELECT id FROM assignments WHERE user_id = ? AND course_id = ?', u.id, courseId);
   if (!assigned) throw new HttpError(404, 'Bu eğitim size atanmamış.');
-  return json(await courseTree(ctx.env, courseId));
+  const tree = await courseTree(ctx.env, courseId);
+  const prog = await all(ctx.env,
+    `SELECT p.topic_id, p.max_position, p.watched_seconds, p.completed
+       FROM topic_progress p JOIN topics t ON t.id = p.topic_id JOIN sections s ON s.id = t.section_id
+      WHERE p.user_id = ? AND s.course_id = ?`, u.id, courseId);
+  const byTopic = new Map(prog.map((r) => [r.topic_id, r]));
+  for (const sec of tree.sections) {
+    for (const t of sec.topics) {
+      const r = byTopic.get(t.id);
+      t.progress = r ? { completed: !!r.completed, max_position: r.max_position, watched_seconds: r.watched_seconds } : { completed: false, max_position: 0, watched_seconds: 0 };
+    }
+  }
+  return json(tree);
 }
 
 // ---------- Yönlendirme ----------
 const routes = [];
-const add = (method, path, handler) =>
-  routes.push([method, new RegExp('^' + path.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler]);
+// options.raw: gövde JSON değil ikili veridir (video parçası); CSRF için özel başlık + aynı Origin şart koşulur.
+const add = (method, path, handler, options = {}) =>
+  routes.push([method, new RegExp('^' + path.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, options]);
 
 add('GET', '/api/setup-status', setupStatus);
 add('POST', '/api/setup', setup);
@@ -518,37 +520,45 @@ add('DELETE', '/api/admin/assignments/:id', deleteAssignment);
 add('GET', '/api/my/courses', myCourses);
 add('GET', '/api/my/courses/:id', myCourse);
 
+videoRoutes(add);
+progressRoutes(add);
+
 export async function handleApi(request, env) {
   const url = new URL(request.url);
   const method = request.method;
+
+  let found = null;
+  for (const [m, re, handler, options] of routes) {
+    if (m !== method) continue;
+    const match = re.exec(url.pathname);
+    if (match) { found = { handler, options, params: match.groups || {} }; break; }
+  }
+  if (!found) throw new HttpError(404, 'Bulunamadı.');
 
   // CSRF koruması: değiştiren isteklerde Origin aynı site olmalı ve içerik JSON olmalı.
   if (method !== 'GET' && method !== 'HEAD') {
     const origin = request.headers.get('origin');
     if (origin && origin !== url.origin) throw new HttpError(403, 'İstek reddedildi.');
-    if (!(request.headers.get('content-type') || '').includes('application/json')) {
+    if (found.options.raw) {
+      // İkili yükleme: tarayıcıların başka siteden gönderemeyeceği özel başlık ve aynı Origin zorunlu.
+      if (origin !== url.origin || request.headers.get('x-karma-upload') !== '1') throw new HttpError(403, 'İstek reddedildi.');
+    } else if (!(request.headers.get('content-type') || '').includes('application/json')) {
       throw new HttpError(415, 'İçerik türü JSON olmalı.');
     }
   }
 
-  for (const [m, re, handler] of routes) {
-    if (m !== method) continue;
-    const match = re.exec(url.pathname);
-    if (!match) continue;
-    let cached;
-    const ctx = {
-      request, env, url, params: match.groups || {},
-      async body() {
-        if (cached === undefined) {
-          try { cached = await request.json(); } catch { throw new HttpError(400, 'Geçersiz istek içeriği.'); }
-          if (cached === null || typeof cached !== 'object' || Array.isArray(cached)) throw new HttpError(400, 'Geçersiz istek içeriği.');
-        }
-        return cached;
-      },
-    };
-    return handler(ctx);
-  }
-  throw new HttpError(404, 'Bulunamadı.');
+  let cached;
+  const ctx = {
+    request, env, url, params: found.params,
+    async body() {
+      if (cached === undefined) {
+        try { cached = await request.json(); } catch { throw new HttpError(400, 'Geçersiz istek içeriği.'); }
+        if (cached === null || typeof cached !== 'object' || Array.isArray(cached)) throw new HttpError(400, 'Geçersiz istek içeriği.');
+      }
+      return cached;
+    },
+  };
+  return found.handler(ctx);
 }
 
 export default {

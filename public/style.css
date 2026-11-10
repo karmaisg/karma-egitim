@@ -217,3 +217,37 @@ dialog::backdrop { background: rgba(23, 24, 26, .55); }
   h1 { font-size: 1.35rem; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- Aşama 2: video oynatıcı, ilerleme, raporlar ---------- */
+dialog.wide { width: min(860px, calc(100vw - 24px)); }
+.topic-row { flex-wrap: wrap; }
+.topic-row .t-title { min-width: 180px; }
+.topic-row .t-title .sub { display: block; }
+.callout { margin: 0 0 12px; }
+
+progress { -webkit-appearance: none; appearance: none; height: 8px; border: 0; border-radius: 99px; background: var(--line); overflow: hidden; width: 100%; }
+progress::-webkit-progress-bar { background: var(--line); border-radius: 99px; }
+progress::-webkit-progress-value { background: var(--red); border-radius: 99px; }
+progress::-moz-progress-bar { background: var(--red); border-radius: 99px; }
+
+.prog { display: flex; align-items: center; gap: 10px; min-width: 130px; }
+.prog progress { flex: 1; }
+.prog span, .prog b { font-size: 13px; font-weight: 600; min-width: 38px; text-align: right; }
+.course-progress { display: grid; gap: 6px; margin-bottom: 16px; padding: 14px 18px; }
+
+.player-wrap { display: grid; gap: 10px; }
+.player { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; aspect-ratio: 16 / 9; }
+.player video { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; }
+.player:fullscreen { border-radius: 0; aspect-ratio: auto; }
+.player-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.player-bar progress { flex: 1; min-width: 120px; }
+.ptime { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 88px; text-align: center; }
+.player-notice { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(23, 24, 26, .9); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.player-question { position: absolute; inset: 0; background: rgba(255, 255, 255, .98); padding: 20px; overflow: auto; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.player-question h3 { margin: 0; font-size: 18px; }
+.pq-label { margin: 0; color: var(--red); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.pq-options { display: grid; gap: 8px; }
+.pq-option { text-align: left; justify-content: flex-start; white-space: normal; height: auto; padding: 10px 14px; }
+.pq-feedback { margin: 0; color: var(--red-dark); font-weight: 600; min-height: 1.2em; }
+.player-wrap .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 640px) { .player-question { padding: 12px; } .player-question h3 { font-size: 16px; } }

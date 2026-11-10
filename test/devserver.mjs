@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import worker from '../src/index.js';
 import { createD1 } from './d1shim.mjs';
+import { createR2 } from './r2shim.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
@@ -18,6 +19,7 @@ for (const line of fs.readFileSync(path.join(root, '_headers'), 'utf8').split('\
 
 const env = {
   DB: createD1(),
+  VIDEOS: createR2(),
   SETUP_CODE: 'deneme-kodu-123',
   ASSETS: {
     async fetch(request) {

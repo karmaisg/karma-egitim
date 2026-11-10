@@ -182,6 +182,7 @@ const ADMIN_NAV = [
   { key: 'users', href: '#/admin/users', label: 'Katılımcılar' },
   { key: 'companies', href: '#/admin/companies', label: 'Firmalar' },
   { key: 'assignments', href: '#/admin/assignments', label: 'Atamalar' },
+  { key: 'reports', href: '#/admin/reports', label: 'Raporlar' },
 ];
 const LEARNER_NAV = [{ key: 'home', href: '#/learner', label: 'Eğitimlerim' }];
 
@@ -460,7 +461,7 @@ async function adminCourse(id) {
     submitLabel: t ? 'Kaydet' : 'Ekle',
     fields: [
       { name: 'title', label: 'Konu adı', required: true, value: t?.title, max: 200 },
-      { name: 'content', label: 'Konu içeriği (metin)', type: 'textarea', rows: 10, value: t?.content, hint: 'Katılımcıya gösterilecek anlatım metni. Video ekleme bir sonraki aşamada gelecek.' },
+      { name: 'content', label: 'Konu içeriği (metin)', type: 'textarea', rows: 10, value: t?.content, hint: 'Videonun altında veya tek başına gösterilecek anlatım metni (isteğe bağlı). Video için konu satırındaki “Video” düğmesini kullanın.' },
     ],
     onSubmit: async (v) => {
       if (t) await api('PUT', `/api/admin/topics/${t.id}`, v); else await api('POST', `/api/admin/sections/${s.id}/topics`, v);
@@ -489,8 +490,13 @@ async function adminCourse(id) {
     s.topics.length === 0 ? h('div', { class: 'empty small' }, 'Bu bölümde henüz konu yok.') : null,
     s.topics.map((t, ti) => h('div', { class: 'topic-row' },
       h('span', { class: 'topic-no' }, `${si + 1}.${ti + 1}`),
-      h('div', { class: 't-title' }, h('b', {}, t.title), ' ', t.content ? h('span', { class: 'chip chip-ok' }, 'içerik var') : h('span', { class: 'chip' }, 'içerik yok')),
+      h('div', { class: 't-title' }, h('b', {}, t.title), ' ',
+        t.content ? h('span', { class: 'chip chip-ok' }, 'içerik var') : h('span', { class: 'chip' }, 'içerik yok'), ' ',
+        t.has_video ? h('span', { class: 'chip chip-ok' }, 'video ' + fmtDur(t.video_duration)) : h('span', { class: 'chip' }, 'video yok'), ' ',
+        t.checkpoint_count ? h('span', { class: 'chip' }, t.checkpoint_count + ' soru') : null),
       arrows('topics', t, ti, s.topics.length),
+      h('button', { class: 'btn btn-sm', onclick: () => videoModal(t, reload) }, 'Video'),
+      t.has_video ? h('button', { class: 'btn btn-sm', onclick: () => checkpointsModal(t, reload).catch((e) => toast(e.message, true)) }, 'Sorular') : null,
       h('button', { class: 'btn btn-sm', onclick: () => topicForm(s, t) }, 'Düzenle'),
       h('button', { class: 'btn btn-sm btn-danger', onclick: () => deleteTopic(t) }, 'Sil'))),
     h('div', { class: 'add-row' }, h('button', { class: 'btn btn-sm', onclick: () => topicForm(s, null) }, '+ Konu ekle'))));
@@ -604,41 +610,13 @@ async function learnerHome() {
         h('span', { class: 'btn btn-primary' }, 'Eğitime git →'))))));
 }
 
-async function learnerCourse(id) {
-  const { course, sections } = await api('GET', `/api/my/courses/${id}`);
-  learnerPage(h('div', {},
-    h('div', { class: 'crumbs' }, h('a', { href: '#/learner' }, 'Eğitimlerim'), h('span', {}, '/'), course.title),
-    pageHead(course.title, course.description || null),
-    sections.length === 0 ? h('div', { class: 'card empty' }, 'Bu eğitimin içeriği henüz hazırlanıyor.')
-      : sections.map((s, si) => h('section', { class: 'card learn-section' },
-        h('div', { class: 'section-head' }, h('span', { class: 'section-no' }, si + 1), h('h3', {}, s.title)),
-        s.topics.length === 0 ? h('div', { class: 'empty small' }, 'Bu bölümde henüz konu yok.') : null,
-        s.topics.map((t, ti) => h('a', { class: 'learn-topic', href: `#/learner/course/${id}/topic/${t.id}` },
-          h('span', { class: 'topic-no' }, `${si + 1}.${ti + 1}`), h('span', {}, t.title), h('span', { class: 'arrow' }, '→')))))), true);
-}
-
-async function learnerTopic(courseId, topicId) {
-  const { course, sections } = await api('GET', `/api/my/courses/${courseId}`);
-  const flat = sections.flatMap((s) => s.topics.map((t) => ({ ...t, section: s.title })));
-  const i = flat.findIndex((t) => t.id === Number(topicId));
-  if (i < 0) throw new Error('Konu bulunamadı.');
-  const t = flat[i];
-  const nav = (x, label, cls) => x ? h('a', { class: 'btn ' + cls, href: `#/learner/course/${courseId}/topic/${x.id}` }, label) : h('span', {});
-  learnerPage(h('div', {},
-    h('div', { class: 'crumbs' }, h('a', { href: '#/learner' }, 'Eğitimlerim'), h('span', {}, '/'),
-      h('a', { href: '#/learner/course/' + courseId }, course.title), h('span', {}, '/'), t.section),
-    h('article', { class: 'card card-pad stack' },
-      h('h1', {}, t.title),
-      t.content ? h('div', { class: 'content-box' }, t.content) : h('p', { class: 'muted' }, 'Bu konunun içeriği henüz eklenmedi.')),
-    h('div', { class: 'pager' }, nav(flat[i - 1], '← ' + (flat[i - 1]?.title || ''), ''), nav(flat[i + 1], (flat[i + 1]?.title || '') + ' →', 'btn-primary'))), true);
-}
-
 // ---------- Yönlendirme ----------
 async function loadUser() {
   state.user = (await api('GET', '/api/me')).user;
 }
 
 async function render() {
+  if (state.cleanup) { try { state.cleanup(); } catch { /* yoksay */ } state.cleanup = null; }
   const hash = location.hash || '#/';
   try {
     if (!state.user) await loadUser();
@@ -658,6 +636,7 @@ async function render() {
       if (sub === 'users') return await adminUsers();
       if (sub === 'companies') return await adminCompanies();
       if (sub === 'assignments') return await adminAssignments();
+      if (sub === 'reports') return await adminReports();
     }
     if (area === 'learner') {
       if (!sub) return await learnerHome();
