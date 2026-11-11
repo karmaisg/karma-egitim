@@ -44,6 +44,7 @@ async function api(method, path, body) {
   if (!res.ok) {
     const err = new Error((data && data.error) || 'Bir hata oluştu.');
     err.status = res.status;
+    err.code = data && data.code;
     throw err;
   }
   return data;
@@ -405,7 +406,7 @@ async function adminUsers() {
   draw();
 
   adminPage('users', h('div', {},
-    pageHead('Katılımcılar', 'Kullanıcı adı ve şifreleriyle sisteme giriş yapacak kişiler', h('button', { class: 'btn btn-primary', onclick: create }, '+ Yeni katılımcı')),
+    pageHead('Katılımcılar', 'Kullanıcı adı ve şifreleriyle sisteme giriş yapacak kişiler', h('div', { class: 'row' }, h('a', { class: 'btn', href: '#/admin/consents' }, 'Aydınlatma onayları'), h('button', { class: 'btn btn-primary', onclick: create }, '+ Yeni katılımcı'))),
     h('div', { class: 'row', 'aria-label': 'Filtreler' }, h('div', { class: 'grow' }, search), h('div', {}, companyFilter)),
     h('div', { style: null, class: 'stack' }, tableCard)));
 }
@@ -654,6 +655,7 @@ async function render() {
       if (sub === 'reports') return await adminReports();
       if (sub === 'exams') return await adminExamResults();
       if (sub === 'certificates') return await adminCertificates();
+      if (sub === 'consents') return await adminConsents();
     }
     if (area === 'learner') {
       if (!sub) return await learnerHome();
@@ -663,6 +665,7 @@ async function render() {
     }
     go(isAdmin ? '#/admin' : '#/learner');
   } catch (err) {
+    if (err.code === 'consent_required') { return consentPage(() => render()); }
     if (err.status === 401) { state.user = null; go('#/login'); return render(); }
     if (state.user) layout(state.user.role === 'admin' ? ADMIN_NAV : LEARNER_NAV, '', { el: errorPage(err) });
     else app.replaceChildren(errorPage(err));

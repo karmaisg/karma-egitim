@@ -30,7 +30,15 @@ class Client {
     if (sc) { const v = sc.split(';')[0]; this.cookie = v.endsWith('=') ? '' : v; }
     return res;
   }
-  async call(method, p, body) { const r = await this.res(method, p, body); return { status: r.status, data: await r.json() }; }
+  async call(method, p, body) {
+    let r = await this.res(method, p, body); let data = await r.json();
+    // Katılımcılar eğitim verilerine ulaşmadan önce aydınlatma metnini onaylamalıdır (testlerde otomatik onaylanır).
+    if (r.status === 403 && data.code === 'consent_required' && !this.noConsent) {
+      await this.res('POST', '/api/my/consent', { accept: true });
+      r = await this.res(method, p, body); data = await r.json();
+    }
+    return { status: r.status, data };
+  }
   get(p) { return this.call('GET', p); }
   post(p, b = {}) { return this.call('POST', p, b); }
   put(p, b = {}) { return this.call('PUT', p, b); }

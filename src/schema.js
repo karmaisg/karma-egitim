@@ -161,6 +161,17 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_exam_questions ON exam_questions(exam_id, position)`,
   `CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)`,
   `CREATE INDEX IF NOT EXISTS idx_exam_grants ON exam_grants(user_id, exam_id)`,
+  // KVKK aydınlatma metni onayları (her metin sürümü için kullanıcı başına bir kayıt)
+  `CREATE TABLE IF NOT EXISTS consents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    accepted_at INTEGER NOT NULL,
+    ip TEXT,
+    user_agent TEXT,
+    UNIQUE(user_id, version)
+  )`,
   // Aşama 4: katılım belgesi (md. 17). Belge, düzenlendiği andaki bilgilerle (snapshot) saklanır.
   `CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

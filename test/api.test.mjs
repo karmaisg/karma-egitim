@@ -9,7 +9,16 @@ const env = { DB: createD1(), SETUP_CODE: 'kurulum-kodu-123', ASSETS: { fetch: a
 
 class Client {
   constructor() { this.cookie = ''; }
-  async call(method, path, body, extraHeaders = {}) {
+  async call(...a) {
+    // Katılımcılar eğitim verilerine ulaşmadan önce aydınlatma metnini onaylamalıdır (testlerde otomatik onaylanır).
+    let r = await this._call(...a);
+    if (r.status === 403 && r.data && r.data.code === 'consent_required') {
+      await this._call('POST', '/api/my/consent', { accept: true });
+      r = await this._call(...a);
+    }
+    return r;
+  }
+  async _call(method, path, body, extraHeaders = {}) {
     const headers = { 'content-type': 'application/json', origin: ORIGIN, ...extraHeaders };
     if (this.cookie) headers.cookie = this.cookie;
     const res = await worker.fetch(new Request(ORIGIN + path, {

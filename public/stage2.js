@@ -4,6 +4,7 @@
 
 const EVENT_LABELS = {
   giris: 'Sisteme giriş yaptı',
+  aydinlatma_onayi: 'Aydınlatma metnini onayladı',
   cikis: 'Sistemden çıkış yaptı',
   konu_acildi: 'Konuyu açtı',
   sekme_degisti: 'Sekmeden ayrıldı (video duraklatıldı)',

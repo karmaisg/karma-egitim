@@ -7,6 +7,7 @@ import { videoRoutes, deleteVideoObjects } from './video.js';
 import { progressRoutes } from './progress.js';
 import { examRoutes } from './exams.js';
 import { certificateRoutes } from './certificate.js';
+import { consentRoutes, enforceConsent } from './consent.js';
 import {
   HttpError, json, reqStr, optStr, textBlock, parseId, username as vUsername, tcNo,
   checkPasswordStrength, hashPassword, verifyPassword, getDummyHash, timingSafeEqual,
@@ -549,6 +550,7 @@ videoRoutes(add);
 progressRoutes(add);
 examRoutes(add);
 certificateRoutes(add);
+consentRoutes(add);
 
 export async function handleApi(request, env) {
   const url = new URL(request.url);
@@ -585,6 +587,10 @@ export async function handleApi(request, env) {
       return cached;
     },
   };
+  // Katılımcı, aydınlatma metnini onaylamadan eğitim verilerine ulaşamaz (onay uç noktası, şifre ve çıkış hariç).
+  if (url.pathname.startsWith('/api/my/') && url.pathname !== '/api/my/consent') {
+    await enforceConsent(ctx, await currentUser(ctx));
+  }
   return found.handler(ctx);
 }
 
@@ -596,7 +602,7 @@ export default {
       await ensureSchema(env.DB);
       return await handleApi(request, env);
     } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.message }, e.status);
+      if (e instanceof HttpError) return json(e.code ? { error: e.message, code: e.code } : { error: e.message }, e.status);
       console.error('Beklenmeyen hata:', e);
       return json({ error: 'Beklenmeyen bir hata oluştu.' }, 500);
     }

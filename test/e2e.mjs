@@ -122,6 +122,14 @@ await lp.waitForSelector('.form-error:not(.hidden)');
 assert.match(await lp.textContent('.form-error'), /hatalı/);
 await lp.fill('#a_password', learnerPw);
 await lp.click('button:has-text("Giriş yap")');
+await lp.waitForSelector('#consent_chk, h1:has-text("Eğitimlerim")');
+if (await lp.locator('#consent_chk').count()) {
+  // Aydınlatma metni onayı: işaretlenmeden düğme kapalı olmalı
+  assert.equal(await lp.locator('button:has-text("Onaylıyorum ve devam ediyorum")').isDisabled(), true);
+  if (process.env.OUT || true) await lp.screenshot({ path: (process.env.OUT || '/tmp') + '/consent-' + Date.now() + '.png' });
+  await lp.check('#consent_chk');
+  await lp.click('button:has-text("Onaylıyorum ve devam ediyorum")');
+}
 await lp.waitForSelector('h1:has-text("Eğitimlerim")');
 assert.equal(await lp.locator('nav a').count(), 1, 'katılımcıda yönetici menüsü olmamalı');
 await lp.screenshot({ path: `${OUT}/08-katilimci-ana.png` });
@@ -136,6 +144,14 @@ assert.equal(await lp.evaluate(() => window.__xss), undefined, 'XSS çalışmama
 await lp.screenshot({ path: `${OUT}/10-katilimci-konu.png` });
 // yönetici adresine gitmeyi dene
 await lp.goto(BASE + '/#/admin/users');
+await lp.waitForSelector('#consent_chk, h1:has-text("Eğitimlerim")');
+if (await lp.locator('#consent_chk').count()) {
+  // Aydınlatma metni onayı: işaretlenmeden düğme kapalı olmalı
+  assert.equal(await lp.locator('button:has-text("Onaylıyorum ve devam ediyorum")').isDisabled(), true);
+  if (process.env.OUT || true) await lp.screenshot({ path: (process.env.OUT || '/tmp') + '/consent-' + Date.now() + '.png' });
+  await lp.check('#consent_chk');
+  await lp.click('button:has-text("Onaylıyorum ve devam ediyorum")');
+}
 await lp.waitForSelector('h1:has-text("Eğitimlerim")');
 // şifre değiştir
 await lp.click('button:has-text("Şifre")');
@@ -153,6 +169,14 @@ await mp.goto(BASE);
 await mp.fill('#a_username', 'ali.yilmaz');
 await mp.fill('#a_password', 'YeniSifre2026');
 await mp.click('button:has-text("Giriş yap")');
+await mp.waitForSelector('#consent_chk, h1:has-text("Eğitimlerim")');
+if (await mp.locator('#consent_chk').count()) {
+  // Aydınlatma metni onayı: işaretlenmeden düğme kapalı olmalı
+  assert.equal(await mp.locator('button:has-text("Onaylıyorum ve devam ediyorum")').isDisabled(), true);
+  if (process.env.OUT || true) await mp.screenshot({ path: (process.env.OUT || '/tmp') + '/consent-' + Date.now() + '.png' });
+  await mp.check('#consent_chk');
+  await mp.click('button:has-text("Onaylıyorum ve devam ediyorum")');
+}
 await mp.waitForSelector('h1:has-text("Eğitimlerim")');
 await mp.screenshot({ path: `${OUT}/11-mobil.png` });
 const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);

@@ -285,3 +285,12 @@ progress::-moz-progress-bar { background: var(--red); border-radius: 99px; }
 .cert-card h3 { margin: 0 0 4px; }
 .cert-card p { margin: 0; }
 .cert-ready { border-color: var(--ok); background: var(--ok-tint); }
+
+/* KVKK aydınlatma metni */
+.consent-text { max-height: 52vh; overflow-y: auto; padding: 16px 20px; border: 1px solid var(--line); border-radius: 10px; background: #fcfbfa; line-height: 1.55; }
+.consent-text h2 { font-size: 1rem; margin: 0 0 4px; }
+.consent-text h3 { font-size: .95rem; margin: 18px 0 6px; }
+.consent-text p { margin: 6px 0; } .consent-text ul { margin: 6px 0; padding-left: 22px; }
+.consent-check { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0 4px; font-weight: 550; cursor: pointer; }
+.consent-check input { margin-top: 4px; width: 18px; height: 18px; flex-shrink: 0; }
+.consent-card { padding: 20px; }

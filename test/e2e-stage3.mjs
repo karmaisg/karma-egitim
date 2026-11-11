@@ -56,6 +56,14 @@ const lp = await lctx.newPage(); watch(lp);
 await lp.goto(BASE);
 await lp.fill('#a_username', 'ali.yilmaz'); await lp.fill('#a_password', pw);
 await lp.click('button:has-text("Giriş yap")');
+await lp.waitForSelector('#consent_chk, h1:has-text("Eğitimlerim")');
+if (await lp.locator('#consent_chk').count()) {
+  // Aydınlatma metni onayı: işaretlenmeden düğme kapalı olmalı
+  assert.equal(await lp.locator('button:has-text("Onaylıyorum ve devam ediyorum")').isDisabled(), true);
+  if (process.env.OUT || true) await lp.screenshot({ path: (process.env.OUT || '/tmp') + '/consent-' + Date.now() + '.png' });
+  await lp.check('#consent_chk');
+  await lp.click('button:has-text("Onaylıyorum ve devam ediyorum")');
+}
 await lp.waitForSelector('h1:has-text("Eğitimlerim")');
 await lp.click('a.course-card');
 await lp.waitForSelector('.learn-topic');

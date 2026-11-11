@@ -40,6 +40,12 @@ Cloudflare tarafında R2 kovasının (`karma-egitim-videolari`) var olması gere
 - Yönetici: Eğitim sayfasında **Belge bilgileri** (süre, şekil, eğiticiler), Firmalar'da **işveren adları**, Atamalar'da **ilk/tekrar** türü, **Belgeler** sayfasında tüm belgeler ve **OSGB unvanı**.
 - Yazı tipleri (OFL lisanslı Carlito, Liberation Serif, Poppins) `tools/fonts` içindedir; değiştirirseniz `node tools/build-fonts.mjs` ile `public/pdf/fonts` yeniden üretilir.
 
+## KVKK aydınlatma metni onayı
+- Katılımcı ilk girişte, eğitim verilerine ulaşmadan önce **Aydınlatma Metni**'ni görür; kutuyu işaretleyip "Onaylıyorum ve devam ediyorum" demeden eğitime geçemez (sunucu tarafında da engellenir).
+- Kayıt: kullanıcı, metin sürümü, metnin SHA-256 özeti, tarih-saat, IP ve tarayıcı bilgisi. Etkinlik günlüğüne de "Aydınlatma metnini onayladı" düşer.
+- Yönetici: Katılımcılar → **Aydınlatma onayları** (kimin onayladığı/beklediği, CSV indirme).
+- Metin `src/consent_text.js` içindedir. Metni değiştirirseniz `CONSENT_VERSION` değerini artırın (v2…); herkesten yeniden onay istenir.
+
 ## Cloudflare'e yükleme (Workers Builds ile GitHub'dan)
 
 1. Bu klasörü bir GitHub deposuna yükleyin.
@@ -64,7 +70,7 @@ Cloudflare tarafında R2 kovasının (`karma-egitim-videolari`) var olması gere
 npm test                             # API testleri (Aşama 1 + 2)
 node test/devserver.mjs              # yerel deneme sunucusu (http://localhost:8787, bellek içi D1 + R2)
 node test/e2e.mjs                    # Aşama 1 tarayıcı testi (Playwright gerekir)
-PORT=8788 node test/devserver.mjs & VIDEO=/yol/test.webm node test/e2e-stage2.mjs   # Aşama 2 tarayıcı testi
+PORT=8788 node test/devserver.mjs & VIDEO=/yol/test.webm node test/e2e-stage2.mjs   # Aşama 2 tarayıcı testi (WebM video, ≥ 30 sn)
 node test/e2e-stage3.mjs             # Aşama 3 tarayıcı testi (aynı sunucu, boş veritabanıyla)
 ```
 
