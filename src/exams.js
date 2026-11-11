@@ -31,7 +31,7 @@ function validateQuestion(b) {
 }
 
 // ---------- Durum hesabı ----------
-async function examAttemptStats(env, userId, examId, maxAttempts) {
+export async function examAttemptStats(env, userId, examId, maxAttempts) {
   const rows = await all(env,
     'SELECT id, finished_at, score, passed, started_at FROM exam_attempts WHERE user_id = ? AND exam_id = ? ORDER BY id', userId, examId);
   const grant = await one(env, 'SELECT MAX(attempts_at_grant) AS n FROM exam_grants WHERE user_id = ? AND exam_id = ?', userId, examId);

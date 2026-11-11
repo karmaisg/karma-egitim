@@ -6,6 +6,7 @@ import { COOKIE, one, all, run, currentUser, requireUser, requireAdmin, logEvent
 import { videoRoutes, deleteVideoObjects } from './video.js';
 import { progressRoutes } from './progress.js';
 import { examRoutes } from './exams.js';
+import { certificateRoutes } from './certificate.js';
 import {
   HttpError, json, reqStr, optStr, textBlock, parseId, username as vUsername, tcNo,
   checkPasswordStrength, hashPassword, verifyPassword, getDummyHash, timingSafeEqual,
@@ -143,7 +144,7 @@ function hazard(v) {
 async function listCompanies(ctx) {
   await requireAdmin(ctx);
   const rows = await all(ctx.env,
-    `SELECT c.id, c.name, c.hazard_class,
+    `SELECT c.id, c.name, c.hazard_class, c.employer_1, c.employer_2,
             (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.active = 1) AS user_count
        FROM companies c ORDER BY c.name COLLATE NOCASE`);
   return json({ companies: rows });
@@ -153,8 +154,8 @@ async function createCompany(ctx) {
   await requireAdmin(ctx);
   const b = await ctx.body();
   const name = reqStr(b.name, 'Firma adı', { max: 150 });
-  const res = await run(ctx.env, 'INSERT INTO companies (name, hazard_class, created_at) VALUES (?,?,?)',
-    name, hazard(b.hazard_class), Date.now());
+  const res = await run(ctx.env, 'INSERT INTO companies (name, hazard_class, employer_1, employer_2, created_at) VALUES (?,?,?,?,?)',
+    name, hazard(b.hazard_class), optStr(b.employer_1, 'İşveren adı', 100), optStr(b.employer_2, 'İşveren vekili adı', 100), Date.now());
   return json({ id: res.meta.last_row_id }, 201);
 }
 
@@ -162,8 +163,9 @@ async function updateCompany(ctx) {
   await requireAdmin(ctx);
   const id = parseId(ctx.params.id, 'Firma');
   const b = await ctx.body();
-  const res = await run(ctx.env, 'UPDATE companies SET name = ?, hazard_class = ? WHERE id = ?',
-    reqStr(b.name, 'Firma adı', { max: 150 }), hazard(b.hazard_class), id);
+  const res = await run(ctx.env, 'UPDATE companies SET name = ?, hazard_class = ?, employer_1 = ?, employer_2 = ? WHERE id = ?',
+    reqStr(b.name, 'Firma adı', { max: 150 }), hazard(b.hazard_class),
+    optStr(b.employer_1, 'İşveren adı', 100), optStr(b.employer_2, 'İşveren vekili adı', 100), id);
   if (!res.meta.changes) throw new HttpError(404, 'Firma bulunamadı.');
   return json({ ok: true });
 }
@@ -414,7 +416,8 @@ async function listAssignments(ctx) {
   await requireAdmin(ctx);
   const rows = await all(ctx.env,
     `SELECT a.id, a.assigned_at, a.user_id, u.full_name, u.username, u.active, c.name AS company_name,
-            a.course_id, co.title AS course_title
+            a.course_id, co.title AS course_title, a.training_type,
+            (SELECT cert.number FROM certificates cert WHERE cert.user_id = a.user_id AND cert.course_id = a.course_id) AS certificate_number
        FROM assignments a
        JOIN users u ON u.id = a.user_id
        JOIN courses co ON co.id = a.course_id
@@ -430,6 +433,7 @@ async function createAssignments(ctx) {
   if (!(await one(ctx.env, 'SELECT id FROM courses WHERE id = ?', courseId))) throw new HttpError(404, 'Eğitim bulunamadı.');
   if (!Array.isArray(b.user_ids) || b.user_ids.length === 0) throw new HttpError(400, 'En az bir katılımcı seçin.');
   if (b.user_ids.length > 500) throw new HttpError(400, 'Tek seferde en fazla 500 katılımcı atanabilir.');
+  const trainingType = b.training_type === 'tekrar' ? 'tekrar' : 'ilk';
   const ids = [...new Set(b.user_ids.map((v) => parseId(v, 'Katılımcı')))];
   const valid = await all(ctx.env,
     `SELECT id FROM users WHERE active = 1 AND role = 'learner' AND id IN (${ids.map(() => '?').join(',')})`, ...ids);
@@ -438,10 +442,23 @@ async function createAssignments(ctx) {
   const now = Date.now();
   const before = await one(ctx.env, 'SELECT COUNT(*) AS n FROM assignments WHERE course_id = ?', courseId);
   await ctx.env.DB.batch(validIds.map((uid) =>
-    ctx.env.DB.prepare('INSERT OR IGNORE INTO assignments (user_id, course_id, assigned_at) VALUES (?,?,?)').bind(uid, courseId, now)));
+    ctx.env.DB.prepare('INSERT OR IGNORE INTO assignments (user_id, course_id, assigned_at, training_type) VALUES (?,?,?,?)').bind(uid, courseId, now, trainingType)));
   const after = await one(ctx.env, 'SELECT COUNT(*) AS n FROM assignments WHERE course_id = ?', courseId);
   const added = after.n - before.n;
   return json({ added, already_assigned: validIds.length - added }, 201);
+}
+
+async function updateAssignment(ctx) {
+  await requireAdmin(ctx);
+  const id = parseId(ctx.params.id, 'Atama');
+  const b = await ctx.body();
+  if (!['ilk', 'tekrar'].includes(b.training_type)) throw new HttpError(400, 'Eğitim türü geçersiz.');
+  const a = await one(ctx.env, 'SELECT user_id, course_id FROM assignments WHERE id = ?', id);
+  if (!a) throw new HttpError(404, 'Atama bulunamadı.');
+  const cert = await one(ctx.env, 'SELECT id FROM certificates WHERE user_id = ? AND course_id = ?', a.user_id, a.course_id);
+  if (cert) throw new HttpError(409, 'Bu atama için katılım belgesi düzenlenmiş; eğitim türü değiştirilemez.');
+  await run(ctx.env, 'UPDATE assignments SET training_type = ? WHERE id = ?', b.training_type, id);
+  return json({ ok: true });
 }
 
 async function deleteAssignment(ctx) {
@@ -522,6 +539,7 @@ add('POST', '/api/admin/topics/:id/move', mover('topics', 'section_id'));
 
 add('GET', '/api/admin/assignments', listAssignments);
 add('POST', '/api/admin/assignments', createAssignments);
+add('PUT', '/api/admin/assignments/:id', updateAssignment);
 add('DELETE', '/api/admin/assignments/:id', deleteAssignment);
 
 add('GET', '/api/my/courses', myCourses);
@@ -530,6 +548,7 @@ add('GET', '/api/my/courses/:id', myCourse);
 videoRoutes(add);
 progressRoutes(add);
 examRoutes(add);
+certificateRoutes(add);
 
 export async function handleApi(request, env) {
   const url = new URL(request.url);

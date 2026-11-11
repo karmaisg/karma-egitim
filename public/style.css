@@ -41,8 +41,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ---------- Üst çubuk ---------- */
 .topbar { background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
 .topbar-inner {
-  max-width: 1180px; margin: 0 auto; padding: 0 20px;
-  display: flex; align-items: center; gap: 28px; min-height: 68px;
+  max-width: 1280px; margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; gap: 16px; min-height: 68px;
 }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); flex-shrink: 0; }
 .brand:hover { text-decoration: none; }
@@ -52,7 +52,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav { display: flex; gap: 2px; overflow-x: auto; flex: 1; scrollbar-width: none; }
 .nav::-webkit-scrollbar { display: none; }
 .nav a {
-  color: var(--ink-2); padding: 22px 14px 20px; font-weight: 550; font-size: .95rem;
+  color: var(--ink-2); padding: 22px 10px 20px; font-weight: 550; font-size: .93rem;
   border-bottom: 3px solid transparent; white-space: nowrap;
 }
 .nav a:hover { color: var(--ink); text-decoration: none; background: #faf9f7; }
@@ -279,3 +279,9 @@ progress::-moz-progress-bar { background: var(--red); border-radius: 99px; }
 .review-opts { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); }
 .review-opts li.right { color: var(--ok); font-weight: 600; }
 .review-opts li.picked:not(.right) { color: var(--red); font-weight: 600; }
+
+/* ---------- Aşama 4: katılım belgesi ---------- */
+.cert-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+.cert-card h3 { margin: 0 0 4px; }
+.cert-card p { margin: 0; }
+.cert-ready { border-color: var(--ok); background: var(--ok-tint); }

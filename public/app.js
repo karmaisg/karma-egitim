@@ -184,6 +184,7 @@ const ADMIN_NAV = [
   { key: 'assignments', href: '#/admin/assignments', label: 'Atamalar' },
   { key: 'reports', href: '#/admin/reports', label: 'Raporlar' },
   { key: 'exams', href: '#/admin/exams', label: 'Sınavlar' },
+  { key: 'certs', href: '#/admin/certificates', label: 'Belgeler' },
 ];
 const LEARNER_NAV = [{ key: 'home', href: '#/learner', label: 'Eğitimlerim' }];
 
@@ -297,6 +298,8 @@ async function adminCompanies() {
       { name: 'name', label: 'Firma adı', required: true, value: c?.name, max: 150 },
       { name: 'hazard_class', label: 'Tehlike sınıfı', type: 'select', options: hazardOptions, value: c?.hazard_class || 'az_tehlikeli',
         hint: 'Temel eğitim süresi ve tekrar periyodu tehlike sınıfına göre belirlenir.' },
+      { name: 'employer_1', label: 'İşveren / işveren vekili 1 (belge için)', value: c?.employer_1 || '', max: 100, full: false },
+      { name: 'employer_2', label: 'İşveren / işveren vekili 2 (isteğe bağlı)', value: c?.employer_2 || '', max: 100, full: false },
     ],
     onSubmit: async (v) => {
       if (c) await api('PUT', `/api/admin/companies/${c.id}`, v); else await api('POST', '/api/admin/companies', v);
@@ -511,6 +514,7 @@ async function adminCourse(id) {
     h('div', { class: 'stack' },
       sectionEls.length ? sectionEls : h('div', { class: 'card empty' }, 'Bu eğitimde henüz bölüm yok. İlk bölümü ekleyerek başlayın.'),
       courseExamsCard(id, exams, reload),
+      certSettingsCard(id),
       h('div', {}, h('button', { class: 'btn btn-primary', onclick: addSection }, '+ Bölüm ekle')))));
 }
 
@@ -520,6 +524,7 @@ async function adminAssignments() {
     api('GET', '/api/admin/users'), api('GET', '/api/admin/courses'), api('GET', '/api/admin/assignments'), api('GET', '/api/admin/companies')]);
   const learners = users.filter((u) => u.role === 'learner' && u.active);
 
+  const typeSel = h('select', { id: 'as_type', 'aria-label': 'Eğitim türü' }, h('option', { value: 'ilk' }, 'İlk defa verilen temel eğitim'), h('option', { value: 'tekrar' }, 'Tekrar verilen temel eğitim'));
   const courseSel = h('select', { id: 'as_course', 'aria-label': 'Eğitim' },
     h('option', { value: '' }, '— Eğitim seçin —'), courses.map((c) => h('option', { value: c.id }, c.title)));
   const companySel = h('select', { 'aria-label': 'Firma' }, h('option', { value: '' }, 'Tüm firmalar'), companies.map((c) => h('option', { value: c.id }, c.name)));
@@ -556,7 +561,7 @@ async function adminAssignments() {
   assignBtn.addEventListener('click', async () => {
     assignBtn.disabled = true;
     try {
-      const r = await api('POST', '/api/admin/assignments', { course_id: Number(courseSel.value), user_ids: [...selected] });
+      const r = await api('POST', '/api/admin/assignments', { course_id: Number(courseSel.value), user_ids: [...selected], training_type: typeSel.value });
       toast(r.already_assigned ? `${r.added} yeni atama yapıldı, ${r.already_assigned} kişiye zaten atanmıştı.` : `${r.added} katılımcıya eğitim atandı.`);
       render();
     } catch (e) { toast(e.message, true); update(); }
@@ -570,14 +575,20 @@ async function adminAssignments() {
     title: 'Atamayı kaldır', message: `${a.full_name} kişisinden "${a.course_title}" eğitimi kaldırılsın mı?`, confirmLabel: 'Kaldır',
     onConfirm: async () => { await api('DELETE', `/api/admin/assignments/${a.id}`); toast('Atama kaldırıldı.'); render(); },
   });
+  const toggleType = async (a) => {
+    try { await api('PUT', `/api/admin/assignments/${a.id}`, { training_type: a.training_type === 'tekrar' ? 'ilk' : 'tekrar' }); render(); } catch (e) { toast(e.message, true); }
+  };
   function drawTable() {
     const rows = assignments.filter((a) => !filterCourse.value || String(a.course_id) === filterCourse.value);
     tableBox.replaceChildren(rows.length === 0 ? h('div', { class: 'empty' }, 'Henüz atama yok.')
-      : h('table', {}, h('thead', {}, h('tr', {}, ['Katılımcı', 'Firma', 'Eğitim', 'Atama tarihi', ''].map((t) => h('th', {}, t)))),
+      : h('table', {}, h('thead', {}, h('tr', {}, ['Katılımcı', 'Firma', 'Eğitim', 'Tür', 'Atama tarihi', ''].map((t) => h('th', {}, t)))),
         h('tbody', {}, rows.map((a) => h('tr', { class: a.active ? '' : 'inactive' },
           h('td', {}, h('b', {}, a.full_name), h('span', { class: 'sub' }, a.username)),
-          h('td', {}, a.company_name || '—'), h('td', {}, a.course_title), h('td', {}, fmtDate(a.assigned_at)),
-          h('td', {}, h('div', { class: 'actions' }, h('button', { class: 'btn btn-sm btn-danger', onclick: () => remove(a) }, 'Kaldır'))))))));
+          h('td', {}, a.company_name || '—'), h('td', {}, a.course_title),
+          h('td', {}, h('span', { class: 'chip' }, TRAINING_TYPE[a.training_type] || 'İlk defa'), a.certificate_number ? h('span', { class: 'sub' }, 'Belge: ' + a.certificate_number) : null), h('td', {}, fmtDate(a.assigned_at)),
+          h('td', {}, h('div', { class: 'actions' },
+            a.certificate_number ? null : h('button', { class: 'btn btn-sm', onclick: () => toggleType(a) }, a.training_type === 'tekrar' ? 'İlk defa yap' : 'Tekrar yap'),
+            h('button', { class: 'btn btn-sm btn-danger', onclick: () => remove(a) }, 'Kaldır'))))))));
   }
   filterCourse.addEventListener('change', drawTable);
   drawTable();
@@ -593,6 +604,7 @@ async function adminAssignments() {
         h('div', { class: 'row' }, countLabel,
           h('button', { class: 'btn btn-sm', type: 'button', onclick: selectVisible }, 'Görünenlerin tümünü seç'),
           h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearSel }, 'Seçimi temizle'))),
+      h('div', { class: 'field' }, h('label', { for: 'as_type' }, '3. Eğitimin türü (belgede yazar)'), typeSel),
       h('div', {}, assignBtn)),
     h('div', { class: 'row list-head' }, h('h2', { class: 'grow' }, 'Mevcut atamalar'), filterCourse),
     tableBox));
@@ -641,6 +653,7 @@ async function render() {
       if (sub === 'assignments') return await adminAssignments();
       if (sub === 'reports') return await adminReports();
       if (sub === 'exams') return await adminExamResults();
+      if (sub === 'certificates') return await adminCertificates();
     }
     if (area === 'learner') {
       if (!sub) return await learnerHome();

@@ -16,6 +16,7 @@ const EVENT_LABELS = {
   sinav_basladi: 'Sınava başladı',
   sinav_bitti: 'Sınavı bitirdi',
   sinav_hakki_verildi: 'Yönetici yeni sınav hakkı tanıdı',
+  belge_duzenlendi: 'Katılım belgesi düzenlendi',
 };
 
 function fmtDur(sec) {
@@ -445,7 +446,7 @@ function topicStatus(t) {
 }
 
 async function learnerCourse(id) {
-  const [{ course, sections }, { exams }] = await Promise.all([api('GET', `/api/my/courses/${id}`), api('GET', `/api/my/courses/${id}/exams`)]);
+  const [{ course, sections }, { exams }, certCard] = await Promise.all([api('GET', `/api/my/courses/${id}`), api('GET', `/api/my/courses/${id}/exams`), learnerCertificateCard(id)]);
   const all = sections.flatMap((s) => s.topics);
   const examRow = (e) => h('a', { class: 'learn-topic exam-row', href: examLink(id, e.id) }, h('span', { class: 'topic-no' }, '✎'), h('span', {}, e.title),
     h('span', { class: 'muted small' }, `${e.question_count} soru`), examStateChip(e), h('span', { class: 'arrow' }, '→'));
@@ -469,7 +470,8 @@ async function learnerCourse(id) {
           t.has_video ? h('span', { class: 'muted small' }, 'Video · ' + fmtDur(t.video_duration)) : null,
           topicStatus(t), h('span', { class: 'arrow' }, '→'))),
         exams.filter((e) => e.kind === 'konu' && s.topics.some((t) => t.id === e.topic_id)).map(examRow))),
-    finalExam ? h('section', { class: 'card learn-section' }, h('div', { class: 'section-head' }, h('h3', {}, 'Eğitim sonu')), examRow(finalExam)) : null), true);
+    finalExam ? h('section', { class: 'card learn-section' }, h('div', { class: 'section-head' }, h('h3', {}, 'Eğitim sonu')), examRow(finalExam)) : null,
+    certCard), true);
 }
 
 async function learnerTopic(courseId, topicId) {

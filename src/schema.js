@@ -161,6 +161,20 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_exam_questions ON exam_questions(exam_id, position)`,
   `CREATE INDEX IF NOT EXISTS idx_exam_answers_attempt ON exam_answers(attempt_id)`,
   `CREATE INDEX IF NOT EXISTS idx_exam_grants ON exam_grants(user_id, exam_id)`,
+  // Aşama 4: katılım belgesi (md. 17). Belge, düzenlendiği andaki bilgilerle (snapshot) saklanır.
+  `CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS certificates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    number TEXT UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    issued_at INTEGER NOT NULL,
+    snapshot TEXT NOT NULL,
+    UNIQUE (user_id, course_id)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_checkpoints_topic ON checkpoints(topic_id, at_second)`,
   `CREATE INDEX IF NOT EXISTS idx_progress_topic ON topic_progress(topic_id)`,
   `CREATE INDEX IF NOT EXISTS idx_answers_user ON checkpoint_answers(user_id, checkpoint_id)`,
@@ -182,11 +196,21 @@ const TOPIC_COLUMNS = [
   ['video_duration', 'INTEGER'], // saniye
 ];
 
+const EXTRA_COLUMNS = {
+  topics: TOPIC_COLUMNS,
+  // Aşama 4
+  companies: [['employer_1', 'TEXT'], ['employer_2', 'TEXT']],
+  courses: [['cert_hours', 'REAL NOT NULL DEFAULT 8'], ['cert_in_person', 'INTEGER NOT NULL DEFAULT 0'], ['cert_remote', 'INTEGER NOT NULL DEFAULT 1'], ['trainers', 'TEXT']],
+  assignments: [['training_type', "TEXT NOT NULL DEFAULT 'ilk'"]],
+};
+
 async function migrate(db) {
-  const have = (await db.prepare("SELECT name FROM pragma_table_info('topics')").all()).results.map((r) => r.name);
-  const missing = TOPIC_COLUMNS.filter(([name]) => !have.includes(name));
-  if (missing.length) {
-    await db.batch(missing.map(([name, type]) => db.prepare(`ALTER TABLE topics ADD COLUMN ${name} ${type}`)));
+  for (const [table, cols] of Object.entries(EXTRA_COLUMNS)) {
+    const have = (await db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all()).results.map((r) => r.name);
+    const missing = cols.filter(([name]) => !have.includes(name));
+    if (missing.length) {
+      await db.batch(missing.map(([name, type]) => db.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`)));
+    }
   }
 }
 

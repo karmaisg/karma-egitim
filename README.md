@@ -32,6 +32,14 @@ Cloudflare tarafında R2 kovasının (`karma-egitim-videolari`) var olması gere
 - **Kayıt:** Her denemenin soruları, seçenekleri, verilen cevaplar, puan ve zamanları saklanır. Sınava giren katılımcı olan sınavın soruları değiştirilemez/silinemez (pasife alınabilir); sınav, konu ve eğitim silinemez.
 - **Sınavlar** menüsü: tüm denemeler, cevap ayrıntısı, CSV indirme.
 
+## Aşama 4 — Katılım belgesi (PDF) (Yönetmelik md. 17)
+- Katılımcı; tüm konuları tamamlayıp (konu ve eğitim sonu) sınavları geçince eğitim sayfasında **"Katılım belgesini indir (PDF)"** düğmesini görür.
+- 1. sayfa örnek belgenin (Ek-2) tasarımıdır; 2. sayfada eğitim konuları ve süreleri yer alır. Belge numarası: `KRM-YIL-000001`.
+- Tarihler, katılımcının eğitime girdiği gerçek günlerdir (2 günde bitirirse iki tarih yazılır).
+- Belge düzenlendiği anda dondurulur; sonradan eğitim/firma adı değişse de belge aynı kalır.
+- Yönetici: Eğitim sayfasında **Belge bilgileri** (süre, şekil, eğiticiler), Firmalar'da **işveren adları**, Atamalar'da **ilk/tekrar** türü, **Belgeler** sayfasında tüm belgeler ve **OSGB unvanı**.
+- Yazı tipleri (OFL lisanslı Carlito, Liberation Serif, Poppins) `tools/fonts` içindedir; değiştirirseniz `node tools/build-fonts.mjs` ile `public/pdf/fonts` yeniden üretilir.
+
 ## Cloudflare'e yükleme (Workers Builds ile GitHub'dan)
 
 1. Bu klasörü bir GitHub deposuna yükleyin.

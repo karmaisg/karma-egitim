@@ -5,6 +5,6 @@
   "type": "module",
   "description": "KARMA OSGB Eğitim Platformu",
   "scripts": {
-    "test": "node --test test/api.test.mjs test/stage2.test.mjs test/stage3.test.mjs"
+    "test": "node --test test/api.test.mjs test/stage2.test.mjs test/stage3.test.mjs test/stage4.test.mjs"
   }
 }
