@@ -243,8 +243,8 @@ async function updateUser(ctx) {
 }
 
 // Deneme/yanlış açılmış katılımcıyı tüm kayıtlarıyla (ilerleme, sınav, onay, oturum) kalıcı siler.
-// Korumalar: yönetici hesabı ve kendi hesabınız silinemez; katılım belgesi düzenlenmiş katılımcı silinemez
-// (belge resmî kayıttır, yalnızca pasife alınır); silmek için kullanıcı adının aynen yazılması gerekir.
+// Korumalar: yönetici hesabı ve kendi hesabınız silinemez; katılım belgesi düzenlenmiş katılımcı
+// (belge resmî kayıttır) ek bir açık onay olmadan silinmez; silmek için kullanıcı adının aynen yazılması gerekir.
 async function deleteUser(ctx) {
   const admin = await requireAdmin(ctx);
   const id = parseId(ctx.params.id, 'Kullanıcı');
@@ -254,8 +254,10 @@ async function deleteUser(ctx) {
   if (id === admin.id) throw new HttpError(400, 'Kendi hesabınızı silemezsiniz.');
   if (target.role !== 'learner') throw new HttpError(400, 'Yönetici hesapları silinemez. Gerekirse önce rolünü katılımcıya çevirin.');
   const cert = await one(ctx.env, 'SELECT COUNT(*) AS n FROM certificates WHERE user_id = ?', id);
-  if (cert.n > 0) throw new HttpError(409, 'Bu katılımcı için katılım belgesi düzenlenmiş. Resmî kayıt olduğu için silinemez; hesabı pasife alabilirsiniz.');
   if (String(b.confirm || '').trim() !== target.username) throw new HttpError(400, 'Silmek için kullanıcı adını aynen yazmalısınız.');
+  if (cert.n > 0 && b.confirm_certificate !== true) {
+    throw Object.assign(new HttpError(409, 'Bu katılımcı için katılım belgesi düzenlenmiş. Belge de silinecek; ayrıca onay gerekir.'), { code: 'certificate_exists' });
+  }
   await run(ctx.env, 'DELETE FROM users WHERE id = ?', id); // ilerleme, sınav, onay, atama, oturum kayıtları zincirleme silinir
   return json({ ok: true });
 }

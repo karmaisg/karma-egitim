@@ -378,10 +378,23 @@ async function adminUsers() {
 
   const sil = (u) => formModal({
     title: 'Katılımcıyı kalıcı sil',
-    intro: `${u.full_name} (${u.username}) ve bu kişiye ait TÜM kayıtlar (atamalar, izleme ilerlemesi, sınav sonuçları, KVKK onayı) kalıcı olarak silinir; geri alınamaz. Bu işlem yalnızca deneme veya yanlış açılmış hesaplar içindir. Katılım belgesi düzenlenmiş katılımcılar silinemez. Gerçek katılımcılar için “Pasife al” kullanın.`,
+    intro: `${u.full_name} (${u.username}) ve bu kişiye ait TÜM kayıtlar (atamalar, izleme ilerlemesi, sınav sonuçları, KVKK onayı) kalıcı olarak silinir; geri alınamaz. Bu işlem yalnızca deneme veya yanlış açılmış hesaplar içindir. Belgesi varsa ayrıca onay istenir. Gerçek katılımcılar için “Pasife al” kullanın.`,
     fields: [{ name: 'confirm', label: 'Onay için kullanıcı adını yazın', required: true, hint: u.username }],
     submitLabel: 'Kalıcı olarak sil',
-    onSubmit: async (v) => { await api('DELETE', `/api/admin/users/${u.id}`, { confirm: v.confirm }); toast('Katılımcı silindi.'); render(); },
+    onSubmit: async (v) => {
+      try { await api('DELETE', `/api/admin/users/${u.id}`, { confirm: v.confirm }); }
+      catch (err) {
+        if (err.code !== 'certificate_exists') throw err;
+        confirmModal({
+          title: 'Katılım belgesi de silinsin mi?',
+          message: `${u.full_name} için düzenlenmiş katılım belgesi var. Devam ederseniz belge kaydı da kalıcı olarak silinir ve geri alınamaz. Yalnızca deneme belgeleri için kullanın.`,
+          confirmLabel: 'Belgeyle birlikte sil',
+          onConfirm: async () => { await api('DELETE', `/api/admin/users/${u.id}`, { confirm: v.confirm, confirm_certificate: true }); toast('Katılımcı ve belgesi silindi.'); render(); },
+        });
+        return;
+      }
+      toast('Katılımcı silindi.'); render();
+    },
   });
 
   const search = h('input', { type: 'search', placeholder: 'Ad veya kullanıcı adı ara…', 'aria-label': 'Ara' });

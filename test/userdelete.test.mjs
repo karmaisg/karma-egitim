@@ -40,7 +40,8 @@ test('deneme katılımcısı silinince video kilidi kalkar; korumalar çalışı
   assert.equal((await admin.call('DELETE', `/api/admin/users/${deneme}`, { confirm: 'yanlis' })).status, 400);
   // sertifikalı katılımcı silinemez
   await q('INSERT INTO certificates (number, user_id, course_id, issued_at, snapshot) VALUES (?,?,?,?,?)', 'T-1', gercek, course, 1, '{}').run();
-  assert.equal((await admin.call('DELETE', `/api/admin/users/${gercek}`, { confirm: 'gercek' })).status, 409);
+  const r409 = await admin.call('DELETE', `/api/admin/users/${gercek}`, { confirm: 'gercek' });
+  assert.equal(r409.status, 409); assert.equal(r409.data.code, 'certificate_exists');
   // kendi hesabı ve yönetici silinemez
   const adminId = (await admin.call('GET', '/api/me')).data.user.id;
   assert.equal((await admin.call('DELETE', `/api/admin/users/${adminId}`, { confirm: 'yonetici' })).status, 400);
@@ -49,8 +50,8 @@ test('deneme katılımcısı silinince video kilidi kalkar; korumalar çalışı
   assert.equal((await q('SELECT COUNT(*) AS n FROM topic_progress WHERE user_id = ?', deneme).first()).n, 0);
   assert.equal((await kilit()).status, 409);
   // gerçek katılımcının kaydı yoksa (silinmişse) kilit kalkar: sertifikayı kaldırıp sil
-  await q('DELETE FROM certificates WHERE user_id = ?', gercek).run();
-  assert.equal((await admin.call('DELETE', `/api/admin/users/${gercek}`, { confirm: 'gercek' })).status, 200);
+  assert.equal((await admin.call('DELETE', `/api/admin/users/${gercek}`, { confirm: 'gercek', confirm_certificate: true })).status, 200);
+  assert.equal((await q('SELECT COUNT(*) AS n FROM certificates WHERE user_id = ?', gercek).first()).n, 0);
   assert.equal((await kilit()).status, 200);
   assert.equal((await admin.call('DELETE', '/api/admin/users/99999', { confirm: 'x' })).status, 404);
 });
