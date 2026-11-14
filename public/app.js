@@ -376,6 +376,14 @@ async function adminUsers() {
     },
   });
 
+  const sil = (u) => formModal({
+    title: 'Katılımcıyı kalıcı sil',
+    intro: `${u.full_name} (${u.username}) ve bu kişiye ait TÜM kayıtlar (atamalar, izleme ilerlemesi, sınav sonuçları, KVKK onayı) kalıcı olarak silinir; geri alınamaz. Bu işlem yalnızca deneme veya yanlış açılmış hesaplar içindir. Katılım belgesi düzenlenmiş katılımcılar silinemez. Gerçek katılımcılar için “Pasife al” kullanın.`,
+    fields: [{ name: 'confirm', label: 'Onay için kullanıcı adını yazın', required: true, hint: u.username }],
+    submitLabel: 'Kalıcı olarak sil',
+    onSubmit: async (v) => { await api('DELETE', `/api/admin/users/${u.id}`, { confirm: v.confirm }); toast('Katılımcı silindi.'); render(); },
+  });
+
   const search = h('input', { type: 'search', placeholder: 'Ad veya kullanıcı adı ara…', 'aria-label': 'Ara' });
   const companyFilter = h('select', { 'aria-label': 'Firmaya göre filtrele' },
     h('option', { value: '' }, 'Tüm firmalar'), companies.map((c) => h('option', { value: c.id }, c.name)));
@@ -396,7 +404,8 @@ async function adminUsers() {
       h('td', {}, h('div', { class: 'actions' },
         h('button', { class: 'btn btn-sm', onclick: () => edit(u) }, 'Düzenle'),
         h('button', { class: 'btn btn-sm', onclick: () => reset(u) }, 'Şifre sıfırla'),
-        h('button', { class: 'btn btn-sm ' + (u.active ? 'btn-danger' : ''), onclick: () => toggle(u) }, u.active ? 'Pasife al' : 'Aktifleştir'))))));
+        h('button', { class: 'btn btn-sm ' + (u.active ? 'btn-danger' : ''), onclick: () => toggle(u) }, u.active ? 'Pasife al' : 'Aktifleştir'),
+        u.role === 'learner' ? h('button', { class: 'btn btn-sm btn-danger', onclick: () => sil(u) }, 'Sil') : null)))));
     tableCard.replaceChildren(rows.length === 0
       ? h('div', { class: 'empty' }, users.length === 0 ? 'Henüz katılımcı eklenmemiş.' : 'Aramanızla eşleşen kayıt yok.')
       : h('table', {}, h('thead', {}, h('tr', {}, ['Ad soyad', 'Firma', 'Rol', 'Durum', 'Atama', ''].map((t) => h('th', {}, t)))), tbody));
